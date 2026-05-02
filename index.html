@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Fair Ride</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=DM+Sans:wght@400;500&display=swap');
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+
+  :root{
+    --yellow:#FFD600;
+    --black:#0D0D0D;
+    --dark:#1A1A1A;
+    --card:#222222;
+    --muted:#888;
+    --green:#00C96F;
+    --red:#FF4545;
+    --orange:#FF8A00;
+  }
+
+  body{
+    background:var(--black);
+    color:#fff;
+    font-family:'DM Sans',sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* ── Header ── */
+  .header{
+    background:var(--yellow);
+    padding:20px 20px 28px;
+    position:relative;
+    overflow:hidden;
+  }
+  .header::after{
+    content:'🚕';
+    font-size:80px;
+    position:absolute;
+    right:-10px;
+    top:10px;
+    opacity:0.25;
+    transform:scaleX(-1);
+  }
+  .header h1{
+    font-family:'Unbounded',sans-serif;
+    font-size:22px;
+    font-weight:900;
+    color:var(--black);
+    line-height:1.2;
+  }
+  .header p{
+    font-size:13px;
+    color:#555;
+    margin-top:6px;
+    font-weight:500;
+  }
+  .rush-badge{
+    display:inline-block;
+    background:var(--black);
+    color:var(--yellow);
+    font-size:11px;
+    font-weight:700;
+    font-family:'Unbounded',sans-serif;
+    padding:4px 10px;
+    border-radius:20px;
+    margin-top:10px;
+    letter-spacing:0.5px;
+    display:none;
+  }
+
+  /* ── Steps ── */
+  .steps{
+    display:flex;
+    gap:8px;
+    padding:16px 20px 0;
+    background:var(--yellow);
+  }
+  .step{
+    flex:1;
+    text-align:center;
+    padding-bottom:12px;
+    position:relative;
+  }
+  .step-icon{
+    width:42px;
+    height:42px;
+    background:rgba(0,0,0,0.12);
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:0 auto 6px;
+    font-size:18px;
+  }
+  .step.active .step-icon{background:var(--black);}
+  .step-label{
+    font-size:10px;
+    font-weight:600;
+    color:rgba(0,0,0,0.55);
+    font-family:'Unbounded',sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+    line-height:1.3;
+  }
+  .step.active .step-label{color:var(--black);}
+
+  /* ── Main content area ── */
+  .content{
+    padding:24px 20px;
+  }
+
+  /* ── Input screen ── */
+  #screen-input{}
+
+  .input-card{
+    background:var(--card);
+    border-radius:20px;
+    padding:20px;
+    margin-bottom:16px;
+    border:1px solid #333;
+  }
+  .input-card label{
+    display:block;
+    font-size:11px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--muted);
+    margin-bottom:10px;
+    font-family:'Unbounded',sans-serif;
+  }
+
+  .distance-input{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .distance-input input[type=range]{
+    flex:1;
+    -webkit-appearance:none;
+    height:6px;
+    background:#333;
+    border-radius:3px;
+    outline:none;
+  }
+  .distance-input input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    background:var(--yellow);
+    cursor:pointer;
+    border:3px solid var(--black);
+    box-shadow:0 0 0 2px var(--yellow);
+  }
+  .distance-val{
+    font-family:'Unbounded',sans-serif;
+    font-size:22px;
+    font-weight:900;
+    color:var(--yellow);
+    min-width:70px;
+    text-align:right;
+  }
+
+  .time-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-top:4px;
+  }
+  .time-btn{
+    background:#2a2a2a;
+    border:1.5px solid #333;
+    color:#bbb;
+    border-radius:12px;
+    padding:10px;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    text-align:center;
+    transition:all 0.15s;
+    font-family:'DM Sans',sans-serif;
+  }
+  .time-btn.selected{
+    background:var(--yellow);
+    border-color:var(--yellow);
+    color:var(--black);
+  }
+
+  .go-btn{
+    width:100%;
+    background:var(--yellow);
+    color:var(--black);
+    border:none;
+    border-radius:16px;
+    padding:18px;
+    font-family:'Unbounded',sans-serif;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    letter-spacing:0.5px;
+    transition:transform 0.1s, opacity 0.1s;
+  }
+  .go-btn:active{transform:scale(0.97);}
+
+  /* ── Loading ── */
+  #screen-loading{display:none; text-align:center; padding:40px 0;}
+  .spinner{
+    width:48px;
+    height:48px;
+    border:4px solid #333;
+    border-top-color:var(--yellow);
+    border-radius:50%;
+    animation:spin 0.7s linear infinite;
+    margin:0 auto 20px;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #screen-loading p{
+    font-family:'Unbounded',sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  /* ── Results ── */
+  #screen-results{display:none;}
+
+  .summary-bar{
+    background:var(--yellow);
+    border-radius:16px;
+    padding:16px 20px;
+    margin-bottom:16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .summary-bar .label{
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.8px;
+    color:rgba(0,0,0,0.55);
+    font-family:'Unbounded',sans-serif;
+  }
+  .summary-bar .value{
+    font-family:'Unbounded',sans-serif;
+    font-size:20px;
+    font-weight:900;
+    color:var(--black);
+  }
+  .overpay-pill{
+    background:var(--black);
+    color:var(--yellow);
+    border-radius:20px;
+    padding:6px 12px;
+    font-size:11px;
+    font-weight:700;
+    font-family:'Unbounded',sans-serif;
+  }
+
+  .result-card{
+    background:var(--card);
+    border-radius:16px;
+    padding:16px;
+    margin-bottom:10px;
+    border:1px solid #2e2e2e;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    transition:transform 0.1s;
+    animation:slideIn 0.3s ease both;
+  }
+  .result-card:active{transform:scale(0.98);}
+  @keyframes slideIn{
+    from{opacity:0;transform:translateY(12px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+  .result-card.best{
+    border:1.5px solid var(--yellow);
+    background:#1e1c00;
+  }
+  .app-icon{
+    width:44px;
+    height:44px;
+    border-radius:12px;
+    background:#333;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:20px;
+    flex-shrink:0;
+  }
+  .app-info{flex:1;min-width:0;}
+  .app-name{
+    font-weight:600;
+    font-size:14px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .app-wait{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .app-right{text-align:right;flex-shrink:0;}
+  .app-price{
+    font-family:'Unbounded',sans-serif;
+    font-size:15px;
+    font-weight:700;
+  }
+  .app-price.best-price{color:var(--green);}
+  .app-price.fair-price{color:#fff;}
+  .app-price.exp-price{color:var(--red);}
+  .app-tag{
+    font-size:10px;
+    font-weight:700;
+    font-family:'Unbounded',sans-serif;
+    margin-top:4px;
+    padding:3px 8px;
+    border-radius:8px;
+    display:inline-block;
+  }
+  .tag-best{background:rgba(0,201,111,0.15);color:var(--green);}
+  .tag-fair{background:rgba(255,255,255,0.08);color:#aaa;}
+  .tag-exp{background:rgba(255,69,69,0.15);color:var(--red);}
+
+  .book-btn{
+    width:100%;
+    background:var(--yellow);
+    color:var(--black);
+    border:none;
+    border-radius:14px;
+    padding:16px;
+    font-family:'Unbounded',sans-serif;
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:16px;
+    letter-spacing:0.3px;
+    transition:transform 0.1s;
+  }
+  .book-btn:active{transform:scale(0.97);}
+
+  .back-btn{
+    width:100%;
+    background:transparent;
+    color:var(--muted);
+    border:1px solid #333;
+    border-radius:14px;
+    padding:14px;
+    font-family:'DM Sans',sans-serif;
+    font-size:13px;
+    font-weight:500;
+    cursor:pointer;
+    margin-top:8px;
+    transition:color 0.15s;
+  }
+  .back-btn:active{color:#fff;}
+
+  .disclaimer{
+    font-size:11px;
+    color:#555;
+    text-align:center;
+    margin-top:16px;
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>Fair Ride<br>Price Checker</h1>
+  <p>Compare taxi apps, find the fairest fare</p>
+  <span class="rush-badge" id="rush-badge">⚡ Rush Hour</span>
+</div>
+
+<!-- Steps -->
+<div class="steps">
+  <div class="step active" id="step-1">
+    <div class="step-icon">📍</div>
+    <div class="step-label">Distance</div>
+  </div>
+  <div class="step" id="step-2">
+    <div class="step-icon">🔍</div>
+    <div class="step-label">Compare</div>
+  </div>
+  <div class="step" id="step-3">
+    <div class="step-icon">✅</div>
+    <div class="step-label">Book</div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- Screen 1: Input -->
+  <div id="screen-input">
+    <div class="input-card">
+      <label>Trip Distance</label>
+      <div class="distance-input">
+        <input type="range" id="dist-slider" min="1" max="30" value="5" step="0.5"
+          oninput="document.getElementById('dist-display').textContent=parseFloat(this.value).toFixed(1)+' km'"/>
+        <div class="distance-val" id="dist-display">5.0 km</div>
+      </div>
+    </div>
+
+    <div class="input-card">
+      <label>Departure Time</label>
+      <div class="time-grid" id="time-grid">
+        <div class="time-btn selected" onclick="selectTime(this,'now')">🕐 Right Now</div>
+        <div class="time-btn" onclick="selectTime(this,'morning')">🌅 Morning Rush</div>
+        <div class="time-btn" onclick="selectTime(this,'evening')">🌆 Evening Rush</div>
+        <div class="time-btn" onclick="selectTime(this,'night')">🌙 Late Night</div>
+      </div>
+    </div>
+
+    <button class="go-btn" onclick="runComparison()">Compare Prices →</button>
+  </div>
+
+  <!-- Screen 2: Loading -->
+  <div id="screen-loading">
+    <div class="spinner"></div>
+    <p id="loading-msg">Checking prices...</p>
+  </div>
+
+  <!-- Screen 3: Results -->
+  <div id="screen-results">
+    <div class="summary-bar">
+      <div>
+        <div class="label">Fair Price</div>
+        <div class="value" id="fair-price">—</div>
+      </div>
+      <div class="overpay-pill" id="overpay-pill">Calculating...</div>
+    </div>
+    <div id="results-list"></div>
+    <button class="book-btn" id="best-book-btn">Book Best Price →</button>
+    <button class="back-btn" onclick="goBack()">← Check Another Route</button>
+    <p class="disclaimer">Prices are estimated based on typical Tashkent rates.<br>Actual fares may vary.</p>
+  </div>
+
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){ tg.expand(); tg.setBackgroundColor('#0D0D0D'); tg.setHeaderColor('#FFD600'); }
+
+const APPS = [
+  {name:'Yandex Go', icon:'🟡', base:5000, pkm:3000, surge:1.3, link:'https://yandex.uz'},
+  {name:'MyTaxi',    icon:'🔵', base:4500, pkm:2900, surge:1.2, link:'https://mytaxi.uz'},
+  {name:'Uklon',     icon:'🟢', base:4000, pkm:2800, surge:1.1, link:'https://uklon.com'},
+  {name:'Fasten',    icon:'🟠', base:4200, pkm:2700, surge:1.15,link:'https://fasten.com'},
+  {name:'WB Taxi',   icon:'⚫', base:3800, pkm:2600, surge:1.05,link:'https://wb.taxi'},
+];
+
+const SURGE_MAP = {now:null, morning:0.2, evening:0.2, night:0.0};
+let selectedTime = 'now';
+
+function isRushHour(){
+  const h = new Date().getHours();
+  return (h>=7&&h<=10)||(h>=17&&h<=20);
+}
+
+const rush = isRushHour();
+if(rush){ document.getElementById('rush-badge').style.display='inline-block'; }
+
+function selectTime(el, val){
+  document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedTime = val;
+}
+
+function calcPrice(dist, app){
+  let s = app.surge;
+  if(selectedTime==='now' && rush) s += 0.2;
+  else if(SURGE_MAP[selectedTime]!==null) s += SURGE_MAP[selectedTime];
+  return Math.round(app.base + dist * app.pkm * s);
+}
+
+function calcWait(){
+  const rush = selectedTime==='morning'||selectedTime==='evening'||(selectedTime==='now'&&isRushHour());
+  return rush ? (5+Math.floor(Math.random()*7)) : (2+Math.floor(Math.random()*4));
+}
+
+function setStep(n){
+  for(let i=1;i<=3;i++){
+    document.getElementById('step-'+i).classList.toggle('active', i<=n);
+  }
+}
+
+const loadingMsgs = ['Checking Yandex Go...','Comparing MyTaxi...','Scanning Uklon...','Calculating fair price...'];
+
+function runComparison(){
+  const dist = parseFloat(document.getElementById('dist-slider').value);
+  document.getElementById('screen-input').style.display='none';
+  document.getElementById('screen-loading').style.display='block';
+  setStep(2);
+
+  let i=0;
+  const interval = setInterval(()=>{
+    document.getElementById('loading-msg').textContent = loadingMsgs[i%loadingMsgs.length];
+    i++;
+  }, 500);
+
+  setTimeout(()=>{
+    clearInterval(interval);
+    showResults(dist);
+  }, 2200);
+}
+
+function showResults(dist){
+  const results = APPS.map(a=>({
+    ...a,
+    price: calcPrice(dist, a),
+    wait:  calcWait()
+  })).sort((a,b)=>a.price-b.price);
+
+  const avg  = Math.round(results.reduce((s,r)=>s+r.price,0)/results.length);
+  const best = results[0];
+  const worst= results[results.length-1];
+  const overpayPct = Math.round((worst.price - best.price)/best.price*100);
+
+  document.getElementById('fair-price').textContent = avg.toLocaleString()+' UZS';
+  document.getElementById('overpay-pill').textContent =
+    'Save up to '+overpayPct+'% by choosing wisely';
+
+  const list = document.getElementById('results-list');
+  list.innerHTML='';
+
+  results.forEach((r,i)=>{
+    const isBest = i===0;
+    const isExp  = r.price > avg;
+    let priceClass = isExp ? 'exp-price' : (isBest ? 'best-price' : 'fair-price');
+    let tagClass   = isExp ? 'tag-exp'   : (isBest ? 'tag-best'   : 'tag-fair');
+    let tagLabel   = isExp ? 'Expensive' : (isBest ? 'Best Pick'  : 'Fair');
+    const diff = Math.round(Math.abs(r.price-avg)/avg*100);
+    const diffStr = r.price>avg ? '+'+diff+'%' : (isBest ? '—' : '-'+diff+'%');
+
+    const card = document.createElement('div');
+    card.className = 'result-card'+(isBest?' best':'');
+    card.style.animationDelay = (i*0.07)+'s';
+    card.innerHTML = `
+      <div class="app-icon">${r.icon}</div>
+      <div class="app-info">
+        <div class="app-name">${r.name}</div>
+        <div class="app-wait">~${r.wait} min wait  ·  ${diffStr} vs avg</div>
+      </div>
+      <div class="app-right">
+        <div class="app-price ${priceClass}">${r.price.toLocaleString()}</div>
+        <div class="app-tag ${tagClass}">${tagLabel}</div>
+      </div>
+    `;
+    card.onclick = ()=>{ if(tg) tg.openLink(r.link); else window.open(r.link,'_blank'); };
+    list.appendChild(card);
+  });
+
+  document.getElementById('best-book-btn').textContent = 'Book '+best.name+' — '+best.price.toLocaleString()+' UZS →';
+  document.getElementById('best-book-btn').onclick = ()=>{
+    if(tg) tg.openLink(best.link); else window.open(best.link,'_blank');
+  };
+
+  document.getElementById('screen-loading').style.display='none';
+  document.getElementById('screen-results').style.display='block';
+  setStep(3);
+
+  if(tg){
+    tg.HapticFeedback.notificationOccurred('success');
+  }
+}
+
+function goBack(){
+  document.getElementById('screen-results').style.display='none';
+  document.getElementById('screen-input').style.display='block';
+  setStep(1);
+}
+</script>
+</body>
+</html>
