@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Fair Ride</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=DM+Sans:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --yellow:#FFD600;--black:#0D0D0D;--card:#1E1E1E;
+  --border:#2E2E2E;--muted:#777;--green:#00C96F;
+  --red:#FF4545;--input-bg:#2A2A2A;
+}
+body{background:var(--black);color:#fff;font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;padding-bottom:40px;}
+
+.header{background:var(--yellow);padding:18px 20px 0;position:relative;overflow:hidden;}
+.header::after{content:'🚕';font-size:90px;position:absolute;right:-15px;top:5px;opacity:0.18;transform:scaleX(-1);}
+.header h1{font-family:'Unbounded',sans-serif;font-size:20px;font-weight:900;color:var(--black);line-height:1.2;}
+.header p{font-size:12px;color:rgba(0,0,0,0.5);margin-top:4px;font-weight:500;}
+.rush-badge{display:none;background:var(--black);color:var(--yellow);font-size:10px;font-weight:700;font-family:'Unbounded',sans-serif;padding:3px 10px;border-radius:20px;margin-top:8px;margin-bottom:4px;letter-spacing:0.5px;}
+
+.steps{display:flex;background:var(--yellow);padding:12px 20px 0;gap:6px;}
+.step{flex:1;text-align:center;padding-bottom:10px;}
+.step-icon{width:38px;height:38px;background:rgba(0,0,0,0.12);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 5px;font-size:16px;}
+.step.active .step-icon{background:var(--black);}
+.step-label{font-size:9px;font-weight:700;color:rgba(0,0,0,0.45);font-family:'Unbounded',sans-serif;text-transform:uppercase;letter-spacing:0.3px;}
+.step.active .step-label{color:var(--black);}
+
+.content{padding:20px;}
+.card{background:var(--card);border-radius:18px;padding:18px;margin-bottom:14px;border:1px solid var(--border);}
+.card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;font-family:'Unbounded',sans-serif;}
+
+/* Manual distance input */
+.manual-wrap{position:relative;}
+.manual-input{
+  width:100%;background:var(--input-bg);border:1.5px solid var(--border);
+  border-radius:14px;padding:16px 60px 16px 18px;color:#fff;
+  font-size:28px;font-family:'Unbounded',sans-serif;font-weight:700;
+  outline:none;
+  -moz-appearance:textfield;
+}
+.manual-input::-webkit-outer-spin-button,
+.manual-input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.manual-input:focus{border-color:var(--yellow);}
+.manual-input::placeholder{color:#444;font-size:15px;font-weight:400;font-family:'DM Sans',sans-serif;}
+.manual-unit{position:absolute;right:18px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted);font-weight:600;pointer-events:none;font-family:'DM Sans',sans-serif;}
+.manual-err{font-size:12px;color:var(--red);margin-top:8px;display:none;padding-left:4px;}
+
+/* Quick km buttons */
+.quick-label{font-size:11px;color:var(--muted);margin:14px 0 8px;font-weight:600;}
+.quick-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.quick-btn{
+  background:#2a2a2a;border:1px solid #383838;color:#ccc;
+  border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;
+  cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.1s;
+}
+.quick-btn:active{background:var(--yellow);color:var(--black);border-color:var(--yellow);}
+
+/* Time selector */
+.time-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.time-btn{background:#2a2a2a;border:1.5px solid #333;color:#bbb;border-radius:12px;padding:11px 8px;font-size:11px;font-weight:600;cursor:pointer;text-align:center;transition:all 0.15s;font-family:'DM Sans',sans-serif;line-height:1.5;}
+.time-btn.selected{background:var(--yellow);border-color:var(--yellow);color:var(--black);}
+
+.go-btn{width:100%;background:var(--yellow);color:var(--black);border:none;border-radius:16px;padding:17px;font-family:'Unbounded',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.5px;transition:transform 0.1s;margin-top:4px;}
+.go-btn:active{transform:scale(0.97);}
+
+/* Loading */
+#screen-loading{display:none;text-align:center;padding:60px 0;}
+.spinner{width:46px;height:46px;border:4px solid #2a2a2a;border-top-color:var(--yellow);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 18px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading-msg{font-family:'Unbounded',sans-serif;font-size:12px;color:var(--muted);font-weight:700;}
+
+/* Results */
+#screen-results{display:none;}
+.route-pill{background:#181818;border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#aaa;}
+
+.summary-bar{background:var(--yellow);border-radius:16px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.sum-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:rgba(0,0,0,0.5);font-family:'Unbounded',sans-serif;}
+.sum-value{font-family:'Unbounded',sans-serif;font-size:20px;font-weight:900;color:var(--black);}
+.overpay-pill{background:var(--black);color:var(--yellow);border-radius:12px;padding:8px 12px;font-size:10px;font-weight:700;font-family:'Unbounded',sans-serif;text-align:center;line-height:1.5;flex-shrink:0;}
+
+.wait-tip{background:#0d1a0d;border:1px solid #1a361a;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#6dbf6d;line-height:1.6;display:none;}
+
+.result-card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;animation:slideIn 0.3s ease both;cursor:pointer;}
+.result-card.best{border:1.5px solid var(--yellow);background:#181600;}
+@keyframes slideIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.app-icon{width:42px;height:42px;border-radius:11px;background:#2a2a2a;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.app-info{flex:1;min-width:0;}
+.app-name{font-weight:600;font-size:14px;}
+.app-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.app-right{text-align:right;flex-shrink:0;}
+.app-price{font-family:'Unbounded',sans-serif;font-size:14px;font-weight:700;}
+.price-best{color:var(--green);}
+.price-fair{color:#fff;}
+.price-exp{color:var(--red);}
+.app-tag{font-size:10px;font-weight:700;font-family:'Unbounded',sans-serif;margin-top:3px;padding:2px 7px;border-radius:6px;display:inline-block;}
+.tag-best{background:rgba(0,201,111,0.15);color:var(--green);}
+.tag-fair{background:rgba(255,255,255,0.07);color:#888;}
+.tag-exp{background:rgba(255,69,69,0.15);color:var(--red);}
+
+.book-btn{width:100%;background:var(--yellow);color:var(--black);border:none;border-radius:14px;padding:15px;font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;cursor:pointer;margin-top:14px;letter-spacing:0.3px;transition:transform 0.1s;}
+.book-btn:active{transform:scale(0.97);}
+.back-btn{width:100%;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:14px;padding:13px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-top:8px;}
+.disclaimer{font-size:11px;color:#444;text-align:center;margin-top:14px;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Fair Ride</h1>
+  <p>Compare Tashkent taxi prices instantly</p>
+  <div class="rush-badge" id="rush-badge">⚡ Rush Hour — prices are higher</div>
+</div>
+
+<div class="steps">
+  <div class="step active" id="step-1"><div class="step-icon">📏</div><div class="step-label">Distance</div></div>
+  <div class="step" id="step-2"><div class="step-icon">🔍</div><div class="step-label">Compare</div></div>
+  <div class="step" id="step-3"><div class="step-icon">✅</div><div class="step-label">Book</div></div>
+</div>
+
+<div class="content">
+
+  <!-- SCREEN 1: INPUT -->
+  <div id="screen-input">
+
+    <div class="card">
+      <div class="card-label">Trip Distance</div>
+      <div class="manual-wrap">
+        <input
+          class="manual-input"
+          id="manual-dist"
+          type="number"
+          min="0.1"
+          max="200"
+          step="0.1"
+          placeholder="e.g. 1.2 or 7.5"
+          inputmode="decimal"
+        />
+        <span class="manual-unit">km</span>
+      </div>
+      <div class="manual-err" id="manual-err">⚠️ Please enter a valid distance (e.g. 1.2)</div>
+      <div class="quick-label">Quick select:</div>
+      <div class="quick-btns">
+        <div class="quick-btn" onclick="setQuick(1)">1 km</div>
+        <div class="quick-btn" onclick="setQuick(2)">2 km</div>
+        <div class="quick-btn" onclick="setQuick(3)">3 km</div>
+        <div class="quick-btn" onclick="setQuick(5)">5 km</div>
+        <div class="quick-btn" onclick="setQuick(10)">10 km</div>
+        <div class="quick-btn" onclick="setQuick(15)">15 km</div>
+        <div class="quick-btn" onclick="setQuick(20)">20 km</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Departure Time</div>
+      <div class="time-grid">
+        <div class="time-btn selected" onclick="selectTime(this,'now')">🕐 Right Now</div>
+        <div class="time-btn" onclick="selectTime(this,'morning')">🌅 Morning Rush<br><small style="opacity:0.6;font-size:10px;">7:00 – 10:00</small></div>
+        <div class="time-btn" onclick="selectTime(this,'evening')">🌆 Evening Rush<br><small style="opacity:0.6;font-size:10px;">17:00 – 20:00</small></div>
+        <div class="time-btn" onclick="selectTime(this,'night')">🌙 Late Night<br><small style="opacity:0.6;font-size:10px;">After 22:00</small></div>
+      </div>
+    </div>
+
+    <button class="go-btn" onclick="runComparison()">Compare Prices →</button>
+  </div>
+
+  <!-- SCREEN 2: LOADING -->
+  <div id="screen-loading">
+    <div class="spinner"></div>
+    <p id="loading-msg">Checking prices...</p>
+  </div>
+
+  <!-- SCREEN 3: RESULTS -->
+  <div id="screen-results">
+    <div class="route-pill" id="route-pill">📏 Trip: <strong id="route-text">—</strong></div>
+    <div class="summary-bar">
+      <div>
+        <div class="sum-label">Fair Price</div>
+        <div class="sum-value" id="fair-price">—</div>
+      </div>
+      <div class="overpay-pill" id="overpay-pill">—</div>
+    </div>
+    <div class="wait-tip" id="wait-tip">💡 <strong>Tip:</strong> Waiting 5–10 min after rush hour could save you 15–20%.</div>
+    <div id="results-list"></div>
+    <button class="book-btn" id="best-book-btn">Book Best Price →</button>
+    <button class="back-btn" onclick="goBack()">← Check Another Route</button>
+    <p class="disclaimer">Prices estimated from typical Tashkent rates.<br>Actual fares may vary slightly.</p>
+  </div>
+
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.setBackgroundColor('#0D0D0D');tg.setHeaderColor('#FFD600');}
+
+const APPS = [
+  {name:'Yandex Go', icon:'🟡', base:5000, pkm:3000, surge:1.3,  link:'https://redirect.appmetrica.yandex.com/serve/1178965444039296892'},
+  {name:'MyTaxi',    icon:'🔵', base:4500, pkm:2900, surge:1.2,  link:'https://mytaxi.uz'},
+  {name:'Uklon',     icon:'🟢', base:4000, pkm:2800, surge:1.1,  link:'https://uklon.com.ua'},
+  {name:'Fasten',    icon:'🟠', base:4200, pkm:2700, surge:1.15, link:'https://fasten.com'},
+  {name:'WB Taxi',   icon:'⚫', base:3800, pkm:2600, surge:1.05, link:'https://wb.taxi'},
+];
+
+let selectedTime = 'now';
+
+function isRushHour(){
+  const h = new Date().getHours();
+  return (h>=7 && h<=10) || (h>=17 && h<=20);
+}
+if(isRushHour()) document.getElementById('rush-badge').style.display = 'inline-block';
+
+function selectTime(el, val){
+  document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedTime = val;
+}
+
+function setQuick(val){
+  document.getElementById('manual-dist').value = val;
+  document.getElementById('manual-err').style.display = 'none';
+}
+
+function calcPrice(dist, app){
+  let s = app.surge;
+  if((selectedTime==='now' && isRushHour()) || selectedTime==='morning' || selectedTime==='evening') s += 0.2;
+  return Math.round(app.base + dist * app.pkm * s);
+}
+
+function calcWait(){
+  const rush = (selectedTime==='now' && isRushHour()) || selectedTime==='morning' || selectedTime==='evening';
+  return rush ? 5 + Math.floor(Math.random()*8) : 2 + Math.floor(Math.random()*4);
+}
+
+function setStep(n){
+  for(let i=1;i<=3;i++) document.getElementById('step-'+i).classList.toggle('active', i<=n);
+}
+
+const MSGS = ['Checking Yandex Go...','Scanning MyTaxi...','Comparing Uklon...','Analysing Fasten...','Calculating fair price...'];
+
+function runComparison(){
+  const raw = document.getElementById('manual-dist').value.trim().replace(',','.');
+  const dist = parseFloat(raw);
+
+  if(!raw || isNaN(dist) || dist <= 0 || dist > 200){
+    document.getElementById('manual-err').style.display = 'block';
+    document.getElementById('manual-dist').focus();
+    return;
+  }
+  document.getElementById('manual-err').style.display = 'none';
+
+  document.getElementById('screen-input').style.display = 'none';
+  document.getElementById('screen-loading').style.display = 'block';
+  setStep(2);
+
+  let i = 0;
+  const iv = setInterval(()=>{ document.getElementById('loading-msg').textContent = MSGS[i++ % MSGS.length]; }, 500);
+  setTimeout(()=>{ clearInterval(iv); showResults(dist); }, 2000);
+}
+
+function showResults(dist){
+  const results = APPS
+    .map(a => ({...a, price: calcPrice(dist, a), wait: calcWait()}))
+    .sort((a,b) => a.price - b.price);
+
+  const avg        = Math.round(results.reduce((s,r) => s+r.price, 0) / results.length);
+  const best       = results[0];
+  const worst      = results[results.length-1];
+  const overpayPct = Math.round((worst.price - best.price) / best.price * 100);
+  const rushOn     = (selectedTime==='now' && isRushHour()) || selectedTime==='morning' || selectedTime==='evening';
+
+  document.getElementById('route-text').textContent = dist.toFixed(1) + ' km trip';
+  document.getElementById('fair-price').textContent = avg.toLocaleString() + ' UZS';
+  document.getElementById('overpay-pill').innerHTML = 'Save up to<br><b>' + overpayPct + '%</b>';
+
+  if(rushOn) document.getElementById('wait-tip').style.display = 'block';
+
+  const list = document.getElementById('results-list');
+  list.innerHTML = '';
+  results.forEach((r, i) => {
+    const isBest = i === 0;
+    const isExp  = r.price > avg;
+    const pCls   = isBest ? 'price-best' : (isExp ? 'price-exp' : 'price-fair');
+    const tCls   = isBest ? 'tag-best'   : (isExp ? 'tag-exp'   : 'tag-fair');
+    const tLbl   = isBest ? 'Best Pick'  : (isExp ? 'Expensive' : 'Fair');
+    const diff   = Math.round(Math.abs(r.price - avg) / avg * 100);
+    const dStr   = r.price > avg ? '+'+diff+'%' : (isBest ? 'cheapest' : '-'+diff+'%');
+
+    const c = document.createElement('div');
+    c.className = 'result-card' + (isBest ? ' best' : '');
+    c.style.animationDelay = (i * 0.07) + 's';
+    c.innerHTML = `
+      <div class="app-icon">${r.icon}</div>
+      <div class="app-info">
+        <div class="app-name">${r.name}</div>
+        <div class="app-sub">~${r.wait} min wait · ${dStr} vs avg</div>
+      </div>
+      <div class="app-right">
+        <div class="app-price ${pCls}">${r.price.toLocaleString()}</div>
+        <div class="app-tag ${tCls}">${tLbl}</div>
+      </div>`;
+    c.onclick = () => { if(tg) tg.openLink(r.link); else window.open(r.link, '_blank'); };
+    list.appendChild(c);
+  });
+
+  document.getElementById('best-book-btn').textContent = 'Book ' + best.name + ' — ' + best.price.toLocaleString() + ' UZS →';
+  document.getElementById('best-book-btn').onclick = () => { if(tg) tg.openLink(best.link); else window.open(best.link, '_blank'); };
+
+  document.getElementById('screen-loading').style.display = 'none';
+  document.getElementById('screen-results').style.display = 'block';
+  setStep(3);
+  if(tg) tg.HapticFeedback.notificationOccurred('success');
+}
+
+function goBack(){
+  document.getElementById('screen-results').style.display = 'none';
+  document.getElementById('screen-input').style.display = 'block';
+  document.getElementById('wait-tip').style.display = 'none';
+  setStep(1);
+}
+</script>
+</body>
+</html>
